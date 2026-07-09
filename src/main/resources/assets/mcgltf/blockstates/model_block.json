@@ -1,0 +1,7 @@
+{
+	"variants": {
+		"": {
+			"model": "mcgltf:block/model_block"
+		}
+	}
+}

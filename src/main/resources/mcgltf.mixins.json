@@ -1,0 +1,13 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "com.micheanl.mcgltf.mixin",
+	"plugin": "com.micheanl.mcgltf.mixin.IrisMixinPlugin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"iris.MixinPBRTextureManager"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

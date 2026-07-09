@@ -1,0 +1,16 @@
+{
+	"mcgltf.config.title": "设置",
+	"mcgltf.config.render": "渲染 / 性能",
+	"mcgltf.config.mesh": "网格着色器（无光影）",
+	"mcgltf.config.mesh.desc": "无光影时用 GL 网格着色器管线绘制，降低 CPU 提交开销。",
+	"mcgltf.config.shaderskin": "光影 GPU 蒙皮",
+	"mcgltf.config.shaderskin.desc": "启用光影包时，用 Compute 着色器在 GPU 上做骨骼蒙皮并写入 gbuffer（原深水路径）。",
+	"mcgltf.config.thumbnails": "指令缩略图预览",
+	"mcgltf.config.thumbnails.desc": "在指令建议列表悬浮模型时，上方显示可旋转的模型缩略图。",
+	"mcgltf.config.itemrender": "物品渲染模型",
+	"mcgltf.config.itemrender.desc": "模型物品在手上/物品栏渲染真实 glTF 模型；关闭则按扩展名显示平面 glTF/GLB 图标物品。",
+	"mcgltf.config.hud": "状态 HUD",
+	"mcgltf.config.hud.desc": "屏幕左上角显示当前选中实例的序号 / 模型 / 变换 / gizmo 模式。",
+	"block.mcgltf.model_block": "模型方块",
+	"entity.mcgltf.model_entity": "模型生物"
+}

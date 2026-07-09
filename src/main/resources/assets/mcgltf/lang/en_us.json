@@ -1,0 +1,16 @@
+{
+	"mcgltf.config.title": "Settings",
+	"mcgltf.config.render": "Rendering / Performance",
+	"mcgltf.config.mesh": "Mesh shader (no shaders)",
+	"mcgltf.config.mesh.desc": "Draw with the GL mesh-shader pipeline when no shader pack is active, reducing CPU submit overhead.",
+	"mcgltf.config.shaderskin": "Shader GPU skinning",
+	"mcgltf.config.shaderskin.desc": "With a shader pack active, skin skeletons on the GPU via a compute shader and write into the gbuffer (formerly deep-water path).",
+	"mcgltf.config.thumbnails": "Command thumbnail preview",
+	"mcgltf.config.thumbnails.desc": "Show a rotatable model thumbnail above the hovered model in command suggestions.",
+	"mcgltf.config.itemrender": "Item renders model",
+	"mcgltf.config.itemrender.desc": "Model items render the real glTF in hand/inventory; when off, show a flat glTF/GLB icon by extension.",
+	"mcgltf.config.hud": "Status HUD",
+	"mcgltf.config.hud.desc": "Show the selected instance's index / model / transform / gizmo mode at the top-left of the screen.",
+	"block.mcgltf.model_block": "Model Block",
+	"entity.mcgltf.model_entity": "Model Entity"
+}

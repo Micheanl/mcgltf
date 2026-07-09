@@ -1,0 +1,77 @@
+#version 430
+
+layout(local_size_x = 64) in;
+
+layout(std430, binding = 0) readonly buffer Src { uint src[]; };
+layout(std430, binding = 1) readonly buffer SkinBuf { uint skin[]; };
+layout(std430, binding = 2) readonly buffer Joints { mat4 joints[]; };
+layout(std430, binding = 3) readonly buffer Morph { vec4 morph[]; };
+layout(std430, binding = 4) writeonly buffer Dst { uint dst[]; };
+
+uniform int VertexCount;
+uniform int Skinned;
+uniform int MorphCount;
+uniform ivec4 MorphIdx0;
+uniform ivec4 MorphIdx1;
+uniform vec4 MorphWt0;
+uniform vec4 MorphWt1;
+
+const int SRC_STRIDE = 15;
+const int SKIN_STRIDE = 4;
+const int DST_STRIDE = 20;
+
+void main() {
+    uint gid = gl_GlobalInvocationID.x;
+    if (gid >= uint(VertexCount)) {
+        return;
+    }
+    int s = int(gid) * SRC_STRIDE;
+    vec3 pos = vec3(uintBitsToFloat(src[s]), uintBitsToFloat(src[s + 1]), uintBitsToFloat(src[s + 2]));
+    vec3 nrm = vec3(uintBitsToFloat(src[s + 3]), uintBitsToFloat(src[s + 4]), uintBitsToFloat(src[s + 5]));
+    vec4 tan = vec4(uintBitsToFloat(src[s + 6]), uintBitsToFloat(src[s + 7]), uintBitsToFloat(src[s + 8]), uintBitsToFloat(src[s + 9]));
+
+    for (int i = 0; i < MorphCount; i++) {
+        int idx = i < 4 ? MorphIdx0[i] : MorphIdx1[i - 4];
+        float wt = i < 4 ? MorphWt0[i] : MorphWt1[i - 4];
+        pos += wt * morph[idx * VertexCount + int(gid)].xyz;
+    }
+
+    if (Skinned == 1) {
+        int k = int(gid) * SKIN_STRIDE;
+        uint j01 = skin[k];
+        uint j23 = skin[k + 1];
+        uint w01 = skin[k + 2];
+        uint w23 = skin[k + 3];
+        float w0 = float(w01 & 0xFFFFu) / 65535.0;
+        float w1 = float(w01 >> 16) / 65535.0;
+        float w2 = float(w23 & 0xFFFFu) / 65535.0;
+        float w3 = float(w23 >> 16) / 65535.0;
+        mat4 m = w0 * joints[int(j01 & 0xFFFFu)]
+               + w1 * joints[int(j01 >> 16)]
+               + w2 * joints[int(j23 & 0xFFFFu)]
+               + w3 * joints[int(j23 >> 16)];
+        float total = w0 + w1 + w2 + w3;
+        if (total > 0.0) {
+            pos = (m * vec4(pos, 1.0)).xyz;
+            mat3 rot = mat3(m);
+            nrm = rot * nrm;
+            tan.xyz = rot * tan.xyz;
+        }
+    }
+
+    nrm = normalize(nrm);
+    tan.xyz = normalize(tan.xyz);
+
+    int d = int(gid) * DST_STRIDE;
+    dst[d] = floatBitsToUint(pos.x);
+    dst[d + 1] = floatBitsToUint(pos.y);
+    dst[d + 2] = floatBitsToUint(pos.z);
+    dst[d + 8] = floatBitsToUint(nrm.x);
+    dst[d + 9] = floatBitsToUint(nrm.y);
+    dst[d + 10] = floatBitsToUint(nrm.z);
+    dst[d + 11] = floatBitsToUint(0.0);
+    dst[d + 16] = floatBitsToUint(tan.x);
+    dst[d + 17] = floatBitsToUint(tan.y);
+    dst[d + 18] = floatBitsToUint(tan.z);
+    dst[d + 19] = floatBitsToUint(-tan.w);
+}

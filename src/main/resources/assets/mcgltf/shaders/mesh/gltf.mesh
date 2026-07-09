@@ -1,0 +1,93 @@
+#version 450
+#extension GL_NV_mesh_shader : require
+
+layout(local_size_x = 32) in;
+layout(triangles, max_vertices = 96, max_primitives = 32) out;
+
+layout(std430, binding = 0) readonly buffer Src { uint src[]; };
+layout(std430, binding = 1) readonly buffer SkinBuf { uint skin[]; };
+layout(std430, binding = 2) readonly buffer Joints { mat4 joints[]; };
+layout(std430, binding = 3) readonly buffer Morph { vec4 morph[]; };
+layout(std430, binding = 5) readonly buffer Index { uint indices[]; };
+
+uniform mat4 MVP;
+uniform mat3 NormalMat;
+uniform int TriangleCount;
+uniform int VertexCount;
+uniform int Skinned;
+uniform int Indices32;
+uniform int MorphCount;
+uniform ivec4 MorphIdx0;
+uniform ivec4 MorphIdx1;
+uniform vec4 MorphWt0;
+uniform vec4 MorphWt1;
+uniform vec2 LightUv;
+
+out Vary {
+	vec2 uv;
+	vec3 nrm;
+	vec4 color;
+	vec2 light;
+} vary[];
+
+const int SRC_STRIDE = 15;
+const int SKIN_STRIDE = 4;
+
+uint index(uint i) {
+	if (Indices32 == 1) {
+		return indices[i];
+	}
+	uint bits = indices[i >> 1];
+	return (i & 1u) == 0u ? (bits & 0xFFFFu) : (bits >> 16);
+}
+
+void main() {
+	uint local = gl_LocalInvocationID.x;
+	uint triBase = gl_WorkGroupID.x * 32u;
+	uint remaining = uint(TriangleCount) - triBase;
+	uint triCount = min(32u, remaining);
+	if (local == 0u) {
+		gl_PrimitiveCountNV = triCount;
+	}
+	if (local >= triCount) {
+		return;
+	}
+	uint tri = triBase + local;
+	for (uint c = 0u; c < 3u; c++) {
+		uint vi = index(tri * 3u + c);
+		int s = int(vi) * SRC_STRIDE;
+		vec3 pos = vec3(uintBitsToFloat(src[s]), uintBitsToFloat(src[s + 1]), uintBitsToFloat(src[s + 2]));
+		vec3 nrm = vec3(uintBitsToFloat(src[s + 3]), uintBitsToFloat(src[s + 4]), uintBitsToFloat(src[s + 5]));
+		vec2 uv = vec2(uintBitsToFloat(src[s + 10]), uintBitsToFloat(src[s + 11]));
+		uint col = src[s + 14];
+		for (int m = 0; m < MorphCount; m++) {
+			int idx = m < 4 ? MorphIdx0[m] : MorphIdx1[m - 4];
+			float wt = m < 4 ? MorphWt0[m] : MorphWt1[m - 4];
+			pos += wt * morph[idx * VertexCount + int(vi)].xyz;
+		}
+		if (Skinned == 1) {
+			int k = int(vi) * SKIN_STRIDE;
+			uint j01 = skin[k];
+			uint j23 = skin[k + 1];
+			uint w01 = skin[k + 2];
+			uint w23 = skin[k + 3];
+			float w0 = float(w01 & 0xFFFFu) / 65535.0;
+			float w1 = float(w01 >> 16) / 65535.0;
+			float w2 = float(w23 & 0xFFFFu) / 65535.0;
+			float w3 = float(w23 >> 16) / 65535.0;
+			mat4 sm = w0 * joints[int(j01 & 0xFFFFu)] + w1 * joints[int(j01 >> 16)]
+					+ w2 * joints[int(j23 & 0xFFFFu)] + w3 * joints[int(j23 >> 16)];
+			if (w0 + w1 + w2 + w3 > 0.0) {
+				pos = (sm * vec4(pos, 1.0)).xyz;
+				nrm = mat3(sm) * nrm;
+			}
+		}
+		uint vtx = local * 3u + c;
+		gl_MeshVerticesNV[vtx].gl_Position = MVP * vec4(pos, 1.0);
+		vary[vtx].uv = uv;
+		vary[vtx].nrm = normalize(NormalMat * nrm);
+		vary[vtx].color = vec4(float(col & 0xFFu), float((col >> 8) & 0xFFu), float((col >> 16) & 0xFFu), float((col >> 24) & 0xFFu)) / 255.0;
+		vary[vtx].light = LightUv;
+		gl_PrimitiveIndicesNV[vtx] = vtx;
+	}
+}

@@ -1,0 +1,35 @@
+{
+	"model": {
+		"type": "minecraft:select",
+		"property": "mcgltf:item_render",
+		"cases": [
+			{
+				"when": true,
+				"model": {
+					"type": "minecraft:special",
+					"base": "mcgltf:block/model_block",
+					"model": {
+						"type": "mcgltf:model"
+					}
+				}
+			}
+		],
+		"fallback": {
+			"type": "minecraft:select",
+			"property": "mcgltf:item_type",
+			"cases": [
+				{
+					"when": "glb",
+					"model": {
+						"type": "minecraft:model",
+						"model": "mcgltf:item/glb_flat"
+					}
+				}
+			],
+			"fallback": {
+				"type": "minecraft:model",
+				"model": "mcgltf:item/gltf_flat"
+			}
+		}
+	}
+}
