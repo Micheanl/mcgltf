@@ -161,4 +161,10 @@ public final class Animator {
 		pose.computeGlobals();
 		return pose;
 	}
+
+	public SkeletonPose restPose() {
+		pose.reset();
+		pose.computeGlobals();
+		return pose;
+	}
 }

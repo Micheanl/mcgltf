@@ -56,6 +56,7 @@ public final class ModelPipelines {
 
 	private static final int MODES = AlphaMode.values().length;
 	private static final RenderPipeline[] CACHE = new RenderPipeline[MODES * 2 * 2 * 2];
+	private static final RenderPipeline[] LOD_CACHE = new RenderPipeline[MODES * 2];
 	private static final RenderPipeline[] OIT_CACHE = new RenderPipeline[2 * 2 * 2];
 	private static RenderPipeline resolve;
 
@@ -68,6 +69,16 @@ public final class ModelPipelines {
 		if (pipeline == null) {
 			pipeline = build(mode, doubleSided, skinned, morphed);
 			CACHE[index] = pipeline;
+		}
+		return pipeline;
+	}
+
+	public static RenderPipeline lod(AlphaMode mode, boolean doubleSided) {
+		int index = mode.ordinal() * 2 + (doubleSided ? 1 : 0);
+		RenderPipeline pipeline = LOD_CACHE[index];
+		if (pipeline == null) {
+			pipeline = buildLod(mode, doubleSided);
+			LOD_CACHE[index] = pipeline;
 		}
 		return pipeline;
 	}
@@ -87,6 +98,32 @@ public final class ModelPipelines {
 			resolve = buildResolve();
 		}
 		return resolve;
+	}
+
+	private static RenderPipeline buildLod(AlphaMode mode, boolean doubleSided) {
+		String variant = "lod_" + mode.name().toLowerCase() + (doubleSided ? "_nocull" : "_cull");
+		RenderPipeline.Builder builder = RenderPipeline.builder()
+				.withLocation(MCglTF.id("pipeline/gltf_" + variant))
+				.withVertexShader(MCglTF.id("core/gltf"))
+				.withFragmentShader(MCglTF.id("core/gltf"))
+				.withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+				.withBindGroupLayout(BindGroupLayouts.FOG)
+				.withBindGroupLayout(MATERIAL_LAYOUT)
+				.withVertexBinding(0, STATIC_FORMAT)
+				.withPrimitiveTopology(PrimitiveTopology.TRIANGLES)
+				.withCull(!doubleSided)
+				.withShaderDefine("LOD_SIMPLE");
+		if (mode == AlphaMode.MASK) {
+			builder.withShaderDefine("ALPHA_MASK");
+		}
+		if (mode == AlphaMode.BLEND) {
+			builder.withShaderDefine("ALPHA_BLEND")
+					.withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
+					.withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false));
+		} else {
+			builder.withDepthStencilState(DepthStencilState.DEFAULT);
+		}
+		return builder.build();
 	}
 
 	private static RenderPipeline build(AlphaMode mode, boolean doubleSided, boolean skinned, boolean morphed) {

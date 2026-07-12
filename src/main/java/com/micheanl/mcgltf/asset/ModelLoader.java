@@ -58,7 +58,7 @@ public final class ModelLoader {
 			}
 			Any root = JsonIterator.deserialize(json);
 			if (root == null || root.valueType() != ValueType.OBJECT) {
-				issues.add(ValidationIssue.error("JSON 根节点不是对象"));
+				issues.add(ValidationIssue.error("JSON root is not an object"));
 				return new LoadResult.Failure(issues);
 			}
 			GltfDocument gltf = GltfDocument.read(root);
@@ -73,13 +73,13 @@ public final class ModelLoader {
 			issues.add(ValidationIssue.error(e.getMessage()));
 			return new LoadResult.Failure(issues);
 		} catch (JsonException e) {
-			issues.add(ValidationIssue.error("JSON 解析失败: " + e.getMessage()));
+			issues.add(ValidationIssue.error("JSON parse failed: " + e.getMessage()));
 			return new LoadResult.Failure(issues);
 		} catch (IOException e) {
-			issues.add(ValidationIssue.error("读取文件失败: " + e.getMessage()));
+			issues.add(ValidationIssue.error("file read failed: " + e.getMessage()));
 			return new LoadResult.Failure(issues);
 		} catch (Exception e) {
-			issues.add(ValidationIssue.error("未预期异常: " + e.getClass().getSimpleName() + ": " + e.getMessage()));
+			issues.add(ValidationIssue.error("unexpected exception: " + e.getClass().getSimpleName() + ": " + e.getMessage()));
 			return new LoadResult.Failure(issues);
 		}
 	}

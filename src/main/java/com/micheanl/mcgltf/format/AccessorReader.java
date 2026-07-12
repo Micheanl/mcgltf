@@ -23,7 +23,7 @@ public final class AccessorReader {
 			case "VEC4", "MAT2" -> 4;
 			case "MAT3" -> 9;
 			case "MAT4" -> 16;
-			default -> throw new GltfException("accessor type 无效: " + type);
+			default -> throw new GltfException("invalid accessor type: " + type);
 		};
 	}
 
@@ -32,7 +32,7 @@ public final class AccessorReader {
 			case BYTE, UNSIGNED_BYTE -> 1;
 			case SHORT, UNSIGNED_SHORT -> 2;
 			case UNSIGNED_INT, FLOAT -> 4;
-			default -> throw new GltfException("componentType 无效: " + componentType);
+			default -> throw new GltfException("invalid componentType: " + componentType);
 		};
 	}
 
@@ -159,7 +159,7 @@ public final class AccessorReader {
 				yield normalized ? Math.max(v / 32767.0f, -1.0f) : v;
 			}
 			case UNSIGNED_INT -> Integer.toUnsignedLong(view.getInt(position));
-			default -> throw new GltfException("componentType 无效: " + componentType);
+			default -> throw new GltfException("invalid componentType: " + componentType);
 		};
 	}
 
@@ -170,7 +170,7 @@ public final class AccessorReader {
 			case UNSIGNED_SHORT -> view.getShort(position) & 0xFFFF;
 			case SHORT -> view.getShort(position);
 			case UNSIGNED_INT, FLOAT -> view.getInt(position);
-			default -> throw new GltfException("componentType 无效: " + componentType);
+			default -> throw new GltfException("invalid componentType: " + componentType);
 		};
 	}
 

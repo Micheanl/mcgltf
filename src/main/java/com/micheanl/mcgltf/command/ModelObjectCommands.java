@@ -59,14 +59,14 @@ public final class ModelObjectCommands {
 		String model = StringArgumentType.getString(context, "model").trim();
 		Path path = EditorConfig.directory().resolve(model);
 		if (!Files.isRegularFile(path)) {
-			source.sendFailure(Component.literal("模型不存在: " + model));
+			source.sendFailure(Component.translatable("mcgltf.command.missing_model", model));
 			return 0;
 		}
 		ServerPlayer player;
 		try {
 			player = source.getPlayerOrException();
 		} catch (CommandSyntaxException e) {
-			source.sendFailure(Component.literal("需要玩家执行"));
+			source.sendFailure(Component.translatable("mcgltf.command.needs_player"));
 			return 0;
 		}
 		ServerLevel level = source.getLevel();
@@ -74,12 +74,12 @@ public final class ModelObjectCommands {
 		level.setBlockAndUpdate(pos, ModelObjects.MODEL_BLOCK.defaultBlockState());
 		BlockEntity entity = level.getBlockEntity(pos);
 		if (!(entity instanceof ModelBlockEntity modelEntity)) {
-			source.sendFailure(Component.literal("放置失败"));
+			source.sendFailure(Component.translatable("mcgltf.command.place_fail"));
 			return 0;
 		}
 		modelEntity.configure(model, 1.0f, 0.0f, 0.0f, 0.0f);
-		source.sendSuccess(() -> Component.literal("✔ 模型方块已放置: " + model
-				+ " @ " + pos.getX() + " " + pos.getY() + " " + pos.getZ()).withStyle(ChatFormatting.GREEN), true);
+		String posStr = pos.getX() + " " + pos.getY() + " " + pos.getZ();
+		source.sendSuccess(() -> Component.translatable("mcgltf.command.placed_block", model, posStr).withStyle(ChatFormatting.GREEN), true);
 		return 1;
 	}
 
@@ -88,22 +88,21 @@ public final class ModelObjectCommands {
 		String model = StringArgumentType.getString(context, "model").trim();
 		Path path = EditorConfig.directory().resolve(model);
 		if (!Files.isRegularFile(path)) {
-			source.sendFailure(Component.literal("模型不存在: " + model));
+			source.sendFailure(Component.translatable("mcgltf.command.missing_model", model));
 			return 0;
 		}
 		ServerPlayer player;
 		try {
 			player = source.getPlayerOrException();
 		} catch (CommandSyntaxException e) {
-			source.sendFailure(Component.literal("需要玩家执行"));
+			source.sendFailure(Component.translatable("mcgltf.command.needs_player"));
 			return 0;
 		}
 		ItemStack stack = new ItemStack(ModelObjects.MODEL_BLOCK_ITEM);
 		stack.set(ModelObjects.MODEL_SOURCE, model);
 		stack.set(DataComponents.CUSTOM_NAME, Component.literal(cleanName(model)));
 		player.addItem(stack);
-		source.sendSuccess(() -> Component.literal("✔ 已给予模型物品: " + model + "（放置即渲染，破坏掉落回物品）")
-				.withStyle(ChatFormatting.GREEN), true);
+		source.sendSuccess(() -> Component.translatable("mcgltf.command.given_item", model).withStyle(ChatFormatting.GREEN), true);
 		return 1;
 	}
 
@@ -112,28 +111,28 @@ public final class ModelObjectCommands {
 		String model = StringArgumentType.getString(context, "model").trim();
 		Path path = EditorConfig.directory().resolve(model);
 		if (!Files.isRegularFile(path)) {
-			source.sendFailure(Component.literal("模型不存在: " + model));
+			source.sendFailure(Component.translatable("mcgltf.command.missing_model", model));
 			return 0;
 		}
 		ServerPlayer player;
 		try {
 			player = source.getPlayerOrException();
 		} catch (CommandSyntaxException e) {
-			source.sendFailure(Component.literal("需要玩家执行"));
+			source.sendFailure(Component.translatable("mcgltf.command.needs_player"));
 			return 0;
 		}
 		ServerLevel level = source.getLevel();
 		ModelEntity entity = ModelObjects.MODEL_ENTITY.create(level, EntitySpawnReason.COMMAND);
 		if (entity == null) {
-			source.sendFailure(Component.literal("生成失败"));
+			source.sendFailure(Component.translatable("mcgltf.command.spawn_fail"));
 			return 0;
 		}
 		Vec3 pos = player.position();
 		entity.snapTo(pos.x, pos.y, pos.z, player.getYRot(), 0.0f);
 		entity.configure(model, 1.0f, 0.0f, 0.0f, 0.0f);
 		level.addFreshEntity(entity);
-		source.sendSuccess(() -> Component.literal("✔ 模型生物已生成: " + model
-				+ String.format(Locale.ROOT, " @ %.1f %.1f %.1f", pos.x, pos.y, pos.z)).withStyle(ChatFormatting.GREEN), true);
+		String posStr = String.format(Locale.ROOT, "@ %.1f %.1f %.1f", pos.x, pos.y, pos.z);
+		source.sendSuccess(() -> Component.translatable("mcgltf.command.spawned_entity", model, posStr).withStyle(ChatFormatting.GREEN), true);
 		return 1;
 	}
 
@@ -144,7 +143,10 @@ public final class ModelObjectCommands {
 	}
 
 	private static String tooltip(Path path, String name) {
-		String type = name.toLowerCase(Locale.ROOT).endsWith(".glb") ? "GLB 二进制" : "glTF";
+		String type = Component.translatable("mcgltf.command.glb_binary").getString();
+		if (!name.toLowerCase(Locale.ROOT).endsWith(".glb")) {
+			type = "glTF";
+		}
 		try {
 			return type + " · " + formatSize(Files.size(path));
 		} catch (IOException e) {

@@ -19,15 +19,15 @@ public record GlbContainer(byte[] json, ByteBuffer binaryChunk) {
 		ByteBuffer buf = source.duplicate().order(ByteOrder.LITTLE_ENDIAN);
 		long fileSize = buf.remaining();
 		if (fileSize < HEADER_BYTES || buf.getInt() != MAGIC) {
-			throw new GltfException("GLB magic 无效");
+			throw new GltfException("invalid GLB magic");
 		}
 		int version = buf.getInt();
 		if (version != VERSION) {
-			throw new GltfException("GLB version 不支持: " + version);
+			throw new GltfException("unsupported GLB version: " + version);
 		}
 		long declared = Integer.toUnsignedLong(buf.getInt());
 		if (declared > fileSize) {
-			throw new GltfException("GLB 长度声明超出文件大小");
+			throw new GltfException("GLB declared length exceeds file size");
 		}
 		byte[] jsonBytes = null;
 		ByteBuffer bin = null;
@@ -35,7 +35,7 @@ public record GlbContainer(byte[] json, ByteBuffer binaryChunk) {
 			int chunkLength = buf.getInt();
 			int chunkType = buf.getInt();
 			if (chunkLength < 0 || chunkLength > buf.remaining()) {
-				throw new GltfException("GLB chunk 长度越界");
+				throw new GltfException("GLB chunk length out of bounds");
 			}
 			int start = buf.position();
 			if (chunkType == CHUNK_JSON && jsonBytes == null) {
@@ -47,7 +47,7 @@ public record GlbContainer(byte[] json, ByteBuffer binaryChunk) {
 			buf.position(start + chunkLength);
 		}
 		if (jsonBytes == null) {
-			throw new GltfException("GLB 缺少 JSON chunk");
+			throw new GltfException("GLB missing JSON chunk");
 		}
 		return new GlbContainer(jsonBytes, bin);
 	}

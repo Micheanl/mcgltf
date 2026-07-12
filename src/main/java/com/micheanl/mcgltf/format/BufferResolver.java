@@ -32,14 +32,14 @@ public final class BufferResolver {
 		ByteBuffer resolved;
 		if (buffer.uri == null) {
 			if (glbBin == null) {
-				throw new GltfException("buffer[" + index + "] 无 uri 且无 GLB BIN chunk");
+				throw new GltfException("buffer[" + index + "] has no uri and no GLB BIN chunk");
 			}
 			resolved = glbBin.duplicate().order(ByteOrder.LITTLE_ENDIAN);
 		} else {
 			resolved = ByteBuffer.wrap(readUri(buffer.uri)).order(ByteOrder.LITTLE_ENDIAN);
 		}
 		if (resolved.remaining() < buffer.byteLength) {
-			throw new GltfException("buffer[" + index + "] 实际数据小于声明 byteLength");
+			throw new GltfException("buffer[" + index + "] actual data smaller than declared byteLength");
 		}
 		buffers[index] = resolved;
 		return resolved;
@@ -55,21 +55,21 @@ public final class BufferResolver {
 		if (uri.startsWith(DATA_PREFIX)) {
 			int marker = uri.indexOf(BASE64_MARKER);
 			if (marker < 0) {
-				throw new GltfException("data URI 非 base64 编码");
+				throw new GltfException("data URI is not base64 encoded");
 			}
 			return Base64.getDecoder().decode(uri.substring(marker + BASE64_MARKER.length()));
 		}
 		if (dir == null) {
-			throw new GltfException("无基准目录，无法解析外部 uri: " + uri);
+			throw new GltfException("no base directory, cannot resolve external uri: " + uri);
 		}
 		Path resolved = dir.resolve(percentDecode(uri)).normalize();
 		if (!resolved.startsWith(dir)) {
-			throw new GltfException("uri 越出模型目录: " + uri);
+			throw new GltfException("uri escapes model directory: " + uri);
 		}
 		try {
 			return Files.readAllBytes(resolved);
 		} catch (IOException e) {
-			throw new GltfException("读取外部文件失败: " + uri, e);
+			throw new GltfException("failed to read external file: " + uri, e);
 		}
 	}
 

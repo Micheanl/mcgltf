@@ -2,10 +2,12 @@ package com.micheanl.mcgltf.render;
 
 import com.micheanl.mcgltf.MCglTF;
 import com.micheanl.mcgltf.compat.iris.IrisCompat;
+import com.micheanl.mcgltf.render.dispatch.RenderClass;
 import com.micheanl.mcgltf.render.texture.LabPbrEncoder;
 import com.micheanl.mcgltf.render.texture.MipmappedTexture;
 import com.micheanl.mcgltf.render.texture.TextureFactory;
 import com.micheanl.mcgltf.scene.Model;
+import com.micheanl.mcgltf.scene.VertexLayout;
 import com.mojang.blaze3d.IndexType;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.Std140Builder;
@@ -21,8 +23,13 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.util.meshoptimizer.MeshOptimizer;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -36,23 +43,35 @@ public final class GpuModel implements AutoCloseable {
 			GpuBuffer skinVertex, int skin, GpuBuffer morphBuffer, int morphTargets, int vertexCount, Model.Primitive prim) {
 	}
 
+	public record LodPart(GpuBuffer index, IndexType indexType, int indexCount, int lod) {
+	}
+
 	public record Material(GpuBuffer ubo, GpuTextureView baseColor, GpuSampler baseSampler,
 			Identifier textureId, DynamicTexture albedo,
 			Model.AlphaMode alphaMode, boolean doubleSided, Model.Material src) {
 	}
+
+	private static final int LOD_LEVELS = 3;
+	private static final float[] LOD_RATIOS = {1.0f, 0.25f, 0.05f};
+	private static final float LOD_ERROR = 0.02f;
+	private static final int MIN_TRIANGLES = 12;
 
 	private final Model model;
 	private final Part[] parts;
 	private final Material[] materials;
 	private final Matrix4f[][] ibm;
 	private final List<AbstractTexture> ownedTextures;
+	private final RenderClass renderClass;
+	private final LodPart[][] lodParts;
 
-	private GpuModel(Model model, Part[] parts, Material[] materials, Matrix4f[][] ibm, List<AbstractTexture> ownedTextures) {
+	private GpuModel(Model model, Part[] parts, Material[] materials, Matrix4f[][] ibm, List<AbstractTexture> ownedTextures, RenderClass renderClass, LodPart[][] lodParts) {
 		this.model = model;
 		this.parts = parts;
 		this.materials = materials;
 		this.ibm = ibm;
 		this.ownedTextures = ownedTextures;
+		this.renderClass = renderClass;
+		this.lodParts = lodParts;
 	}
 
 	public Model model() {
@@ -61,6 +80,14 @@ public final class GpuModel implements AutoCloseable {
 
 	public Part[] parts() {
 		return parts;
+	}
+
+	public LodPart[] lodPart(int partIndex) {
+		return lodParts[partIndex];
+	}
+
+	public int lodLevels() {
+		return lodParts.length > 0 ? lodParts[0].length : 1;
 	}
 
 	public Material[] materials() {
@@ -73,6 +100,102 @@ public final class GpuModel implements AutoCloseable {
 
 	public float[] aabb() {
 		return model.aabb();
+	}
+
+	public RenderClass renderClass() {
+		return renderClass;
+	}
+
+	private static LodPart[][] fallbackLods(Part[] parts) {
+		LodPart[][] lods = new LodPart[parts.length][];
+		for (int p = 0; p < parts.length; p++) {
+			lods[p] = new LodPart[]{new LodPart(parts[p].index(), parts[p].indexType(), parts[p].indexCount(), 0)};
+		}
+		return lods;
+	}
+
+	private static LodPart[][] generateLods(GpuDevice device, Part[] parts, RenderClass rc) {
+		LodPart[][] lods = new LodPart[parts.length][];
+		for (int p = 0; p < parts.length; p++) {
+			lods[p] = buildLodChain(device, parts[p], rc);
+		}
+		return lods;
+	}
+
+	private static LodPart[] buildLodChain(GpuDevice device, Part part, RenderClass rc) {
+		if (rc == RenderClass.TERRAIN) {
+			int triangles = part.indexCount() / 3;
+			LodPart[] chain = new LodPart[LOD_LEVELS];
+			chain[0] = new LodPart(part.index(), part.indexType(), part.indexCount(), 0);
+			for (int lod = 1; lod < LOD_LEVELS; lod++) {
+				int target = Math.max(MIN_TRIANGLES, (int)(triangles * LOD_RATIOS[lod]));
+				if (target >= triangles) {
+					chain[lod] = chain[lod - 1];
+				} else {
+					chain[lod] = simplify(device, part, target * 3, lod);
+				}
+			}
+			return chain;
+		}
+		return new LodPart[]{new LodPart(part.index(), part.indexType(), part.indexCount(), 0)};
+	}
+
+	private static LodPart simplify(GpuDevice device, Part part, int targetIndexCount, int lod) {
+		Model.Primitive prim = part.prim();
+		ByteBuffer vertexData = prim.vertices().duplicate().order(ByteOrder.nativeOrder());
+		ByteBuffer indexData = prim.indices().duplicate().order(ByteOrder.nativeOrder());
+		boolean indices32 = prim.indices32();
+		int vertexCount = part.vertexCount();
+		int srcIndexCount = prim.indexCount();
+		int[] sourceIndices = new int[srcIndexCount];
+		for (int i = 0; i < srcIndexCount; i++) {
+			sourceIndices[i] = indices32 ? indexData.getInt(i * 4) : (indexData.getShort(i * 2) & 0xFFFF);
+		}
+		FloatBuffer positions = MemoryUtil.memAllocFloat(vertexCount * 3);
+		try {
+			for (int v = 0; v < vertexCount; v++) {
+				int base = v * VertexLayout.STATIC_STRIDE;
+				positions.put(vertexData.getFloat(base + VertexLayout.POSITION_OFFSET));
+				positions.put(vertexData.getFloat(base + VertexLayout.POSITION_OFFSET + 4));
+				positions.put(vertexData.getFloat(base + VertexLayout.POSITION_OFFSET + 8));
+			}
+			positions.flip();
+			int[] destIndices = new int[targetIndexCount];
+			IntBuffer source = MemoryUtil.memAllocInt(srcIndexCount);
+			IntBuffer dest = MemoryUtil.memAllocInt(targetIndexCount);
+			try {
+				source.put(sourceIndices).flip();
+				int result = (int) MeshOptimizer.meshopt_simplify(dest, source, positions, vertexCount, 12L, targetIndexCount, LOD_ERROR, 0, null);
+				dest.get(destIndices);
+				int actualCount = result < targetIndexCount ? result : targetIndexCount;
+				if (actualCount < 3) {
+					return new LodPart(part.index(), part.indexType(), part.indexCount(), lod);
+				}
+				MeshOptimizer.meshopt_optimizeVertexCache(dest, dest, vertexCount);
+				dest.position(0).limit(actualCount);
+				MeshOptimizer.meshopt_optimizeOverdraw(dest, dest, positions, vertexCount, 12, 1.05f);
+				dest.position(0).limit(actualCount);
+				boolean out32 = vertexCount > 0xFFFF;
+				ByteBuffer outBuf = ByteBuffer.allocateDirect(actualCount * (out32 ? 4 : 2)).order(ByteOrder.nativeOrder());
+				if (out32) {
+					for (int i = 0; i < actualCount; i++) {
+						outBuf.putInt(destIndices[i]);
+					}
+				} else {
+					for (int i = 0; i < actualCount; i++) {
+						outBuf.putShort((short) destIndices[i]);
+					}
+				}
+				outBuf.flip();
+				GpuBuffer indexBuffer = device.createBuffer(() -> "mcgltf_lod" + lod, GpuBuffer.USAGE_INDEX, outBuf);
+				return new LodPart(indexBuffer, out32 ? IndexType.INT : IndexType.SHORT, actualCount, lod);
+			} finally {
+				MemoryUtil.memFree(dest);
+				MemoryUtil.memFree(source);
+			}
+		} finally {
+			MemoryUtil.memFree(positions);
+		}
 	}
 
 	public static GpuModel upload(Model model) {
@@ -119,7 +242,15 @@ public final class GpuModel implements AutoCloseable {
 						skinVertex, skin, morphBuffer, morphTargets, prim.vertexCount(), prim));
 			}
 		}
-		return new GpuModel(model, parts.toArray(Part[]::new), materials, ibm, ownedTextures);
+		Part[] partArray = parts.toArray(Part[]::new);
+		RenderClass rc = RenderClass.classify(model.stats());
+		LodPart[][] lodParts;
+		try {
+			lodParts = generateLods(device, partArray, rc);
+		} catch (Exception e) {
+			lodParts = fallbackLods(partArray);
+		}
+		return new GpuModel(model, partArray, materials, ibm, ownedTextures, rc, lodParts);
 	}
 
 	private static Matrix4f[][] inverseBindMatrices(Model model) {
@@ -263,6 +394,13 @@ public final class GpuModel implements AutoCloseable {
 			}
 			if (part.morphBuffer() != null) {
 				part.morphBuffer().close();
+			}
+		}
+		for (LodPart[] chain : lodParts) {
+			for (int lod = 1; lod < chain.length; lod++) {
+				if (chain[lod].index() != chain[0].index()) {
+					chain[lod].index().close();
+				}
 			}
 		}
 		for (Material material : materials) {

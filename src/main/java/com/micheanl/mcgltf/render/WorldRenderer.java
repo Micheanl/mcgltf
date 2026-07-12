@@ -11,6 +11,8 @@ import com.micheanl.mcgltf.compat.iris.IrisEntityRenderType;
 import com.micheanl.mcgltf.config.EditorConfig;
 import com.micheanl.mcgltf.scene.Model;
 import com.micheanl.mcgltf.scene.Model.AlphaMode;
+import com.micheanl.mcgltf.render.dispatch.RenderClass;
+import com.micheanl.mcgltf.render.dispatch.LodConfig;
 import com.micheanl.mcgltf.scene.VertexLayout;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
@@ -128,11 +130,16 @@ public final class WorldRenderer {
 			drawShader(context, blendPass);
 		} else {
 			if (EditorConfig.meshShader && GlCapabilities.mesh()) {
-				MeshShaderRenderer.init();
-				meshRender(context, blendPass);
-			} else {
-				render(context, blendPass);
+				try {
+					MeshShaderRenderer.init();
+					meshRender(context, blendPass);
+					return;
+				} catch (RuntimeException e) {
+					EditorConfig.meshShader = false;
+					EditorConfig.save();
+				}
 			}
+			render(context, blendPass);
 		}
 	}
 
@@ -142,6 +149,7 @@ public final class WorldRenderer {
 		private GpuBufferSlice transform;
 		private GpuBufferSlice joints;
 		private GpuBufferSlice instance;
+		private GpuModel.LodPart lodPart;
 
 		private void set(GpuModel.Part part, GpuModel.Material material, GpuBufferSlice transform, GpuBufferSlice joints, GpuBufferSlice instance) {
 			this.part = part;
@@ -149,6 +157,16 @@ public final class WorldRenderer {
 			this.transform = transform;
 			this.joints = joints;
 			this.instance = instance;
+			this.lodPart = null;
+		}
+
+		private void setLod(GpuModel.Part part, GpuModel.LodPart lodPart, GpuModel.Material material, GpuBufferSlice transform) {
+			this.part = part;
+			this.material = material;
+			this.transform = transform;
+			this.joints = null;
+			this.instance = null;
+			this.lodPart = lodPart;
 		}
 	}
 
@@ -198,11 +216,20 @@ public final class WorldRenderer {
 			return;
 		}
 		Frustum frustum = context.levelState().cameraRenderState.cullFrustum;
+		Vec3 cameraPos = context.levelState().cameraRenderState.pos;
 		boolean began = false;
 		for (SceneRegistry.Instance instance : instances) {
 			GpuModel model = instance.model();
 			if (!visible(frustum, model.aabb(), instance)) {
 				continue;
+			}
+			if (model.renderClass().animated()) {
+				float dx = (float)(instance.x() - cameraPos.x);
+				float dy = (float)(instance.y() - cameraPos.y);
+				float dz = (float)(instance.z() - cameraPos.z);
+				if (!lodWithin(dx, dy, dz, LodConfig.of(model.renderClass()).animationDist())) {
+					continue;
+				}
 			}
 			GpuInstance gpu = instance.gpu(light(level, instance));
 			GpuModel.Part[] parts = model.parts();
@@ -257,8 +284,20 @@ public final class WorldRenderer {
 			if (!visible(frustum, model.aabb(), instance)) {
 				continue;
 			}
+			float dx = (float)(instance.x() - cameraPos.x);
+			float dy = (float)(instance.y() - cameraPos.y);
+			float dz = (float)(instance.z() - cameraPos.z);
+			RenderClass rc = model.renderClass();
+			LodConfig lod = LodConfig.of(rc);
+			if (!lodWithin(dx, dy, dz, lod.renderDist())) {
+				continue;
+			}
+			if (blendPass && !lodWithin(dx, dy, dz, lod.transparencyDist())) {
+				continue;
+			}
+			boolean animate = rc.animated() && lodWithin(dx, dy, dz, lod.animationDist());
 			GpuInstance gpu = instance.gpu(light(level, instance));
-			SkeletonPose pose = instance.animator().evaluate();
+			SkeletonPose pose = animate ? instance.animator().evaluate() : instance.animator().restPose();
 			Matrix4f base = rotate(new Matrix4f(viewRotation)
 					.translate((float) (instance.x() - cameraPos.x), (float) (instance.y() - cameraPos.y), (float) (instance.z() - cameraPos.z)), instance)
 					.scale(instance.scale());
@@ -346,8 +385,17 @@ public final class WorldRenderer {
 			if (!visible(frustum, model.aabb(), instance)) {
 				continue;
 			}
+			float dx = (float)(instance.x() - cameraPos.x);
+			float dy = (float)(instance.y() - cameraPos.y);
+			float dz = (float)(instance.z() - cameraPos.z);
+			RenderClass rc = model.renderClass();
+			LodConfig lod = LodConfig.of(rc);
+			if (!lodWithin(dx, dy, dz, lod.renderDist())) {
+				continue;
+			}
+			boolean animate = rc.animated() && lodWithin(dx, dy, dz, lod.animationDist());
 			int light = light(level, instance);
-			SkeletonPose pose = instance.animator().evaluate();
+			SkeletonPose pose = animate ? instance.animator().evaluate() : instance.animator().restPose();
 			for (GpuModel.Part part : model.parts()) {
 				GpuModel.Material material = model.materials()[part.material()];
 				Model.Primitive prim = part.prim();
@@ -525,7 +573,19 @@ public final class WorldRenderer {
 			Matrix4f base = rotate(new Matrix4f(viewRotation)
 					.translate((float) (instance.x() - cameraPos.x), (float) (instance.y() - cameraPos.y), (float) (instance.z() - cameraPos.z)), instance)
 					.scale(instance.scale());
-			SkeletonPose pose = instance.animator().evaluate();
+			float dx = (float)(instance.x() - cameraPos.x);
+			float dy = (float)(instance.y() - cameraPos.y);
+			float dz = (float)(instance.z() - cameraPos.z);
+			RenderClass rc = model.renderClass();
+			LodConfig lod = LodConfig.of(rc);
+			if (!lodWithin(dx, dy, dz, lod.renderDist())) {
+				continue;
+			}
+			if (blendPass && !lodWithin(dx, dy, dz, lod.transparencyDist())) {
+				continue;
+			}
+			boolean animate = rc.animated() && lodWithin(dx, dy, dz, lod.animationDist());
+			SkeletonPose pose = animate ? instance.animator().evaluate() : instance.animator().restPose();
 			int skinCount = model.model().skins().length;
 			if (palettePool.length < skinCount) {
 				palettePool = new GpuBufferSlice[skinCount];
@@ -533,9 +593,21 @@ public final class WorldRenderer {
 			for (int s = 0; s < skinCount; s++) {
 				palettePool[s] = null;
 			}
+			float dist = (float)Math.sqrt(dx*dx + dy*dy + dz*dz);
+			int lodLevel = (rc == RenderClass.TERRAIN) ? lod.meshLod(dist) : 0;
+			int partIdx = 0;
 			for (GpuModel.Part part : model.parts()) {
 				GpuModel.Material material = model.materials()[part.material()];
 				if ((material.alphaMode() == AlphaMode.BLEND) != blendPass) {
+					partIdx++;
+					continue;
+				}
+				if (lodLevel > 0 && part.skinVertex() == null && part.morphBuffer() == null) {
+					Matrix4f modelView = new Matrix4f(base).mul(pose.global(part.node()));
+					GpuBufferSlice transform = dynamicUniforms.writeTransform(modelView, WHITE, lightCoords, IDENTITY);
+					GpuModel.LodPart lp = model.lodPart(partIdx)[lodLevel];
+					nextCall().setLod(part, lp, material, transform);
+					partIdx++;
 					continue;
 				}
 				GpuBufferSlice joints = null;
@@ -554,6 +626,7 @@ public final class WorldRenderer {
 						? morphInstance(encoder, pose.weights(part.node()), part.vertexCount(), alignment) : null;
 				GpuBufferSlice transform = dynamicUniforms.writeTransform(modelView, WHITE, lightCoords, IDENTITY);
 				nextCall().set(part, material, transform, joints, morphInstance);
+				partIdx++;
 			}
 		}
 		if (callCount == 0) {
@@ -576,15 +649,18 @@ public final class WorldRenderer {
 			RenderPipeline current = null;
 			for (int c = 0; c < callCount; c++) {
 				Call call = callPool[c];
+				boolean isLod = call.lodPart != null;
 				boolean skinned = call.joints != null;
 				boolean morphed = call.instance != null;
-				RenderPipeline pipeline = ModelPipelines.get(call.material.alphaMode(), call.material.doubleSided(), skinned, morphed);
+				RenderPipeline pipeline = isLod
+						? ModelPipelines.lod(call.material.alphaMode(), call.material.doubleSided())
+						: ModelPipelines.get(call.material.alphaMode(), call.material.doubleSided(), skinned, morphed);
 				if (pipeline != current) {
 					pass.setPipeline(pipeline);
 					RenderSystem.bindDefaultUniforms(pass);
 					current = pipeline;
 				}
-				bindAndDraw(pass, call, lightmap, lightmapSampler);
+				bindAndDraw(pass, call, lightmap, lightmapSampler, isLod);
 			}
 		}
 	}
@@ -610,7 +686,7 @@ public final class WorldRenderer {
 					RenderSystem.bindDefaultUniforms(pass);
 					current = pipeline;
 				}
-				bindAndDraw(pass, call, lightmap, lightmapSampler);
+				bindAndDraw(pass, call, lightmap, lightmapSampler, false);
 			}
 		}
 		GpuSampler oitSampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
@@ -622,12 +698,15 @@ public final class WorldRenderer {
 		}
 	}
 
-	private static void bindAndDraw(RenderPass pass, Call call, GpuTextureView lightmap, GpuSampler lightmapSampler) {
+	private static void bindAndDraw(RenderPass pass, Call call, GpuTextureView lightmap, GpuSampler lightmapSampler, boolean lodSimple) {
 		boolean skinned = call.joints != null;
 		boolean morphed = call.instance != null;
+		GpuModel.LodPart lodPart = call.lodPart;
 		pass.setUniform("DynamicTransforms", call.transform);
 		pass.setUniform("GltfMaterial", call.material.ubo());
-		pass.bindTexture("Sampler0", call.material.baseColor(), call.material.baseSampler());
+		if (!lodSimple) {
+			pass.bindTexture("Sampler0", call.material.baseColor(), call.material.baseSampler());
+		}
 		pass.bindTexture("Sampler2", lightmap, lightmapSampler);
 		pass.setVertexBuffer(0, call.part.vertex().slice());
 		if (skinned) {
@@ -640,8 +719,13 @@ public final class WorldRenderer {
 			pass.setUniform("GltfInstance", call.instance);
 			pass.setUniform("GltfMorph", call.part.morphBuffer());
 		}
-		pass.setIndexBuffer(call.part.index(), call.part.indexType());
-		pass.drawIndexed(call.part.indexCount(), 1, 0, 0, 0);
+		if (lodPart != null) {
+			pass.setIndexBuffer(lodPart.index(), lodPart.indexType());
+			pass.drawIndexed(lodPart.indexCount(), 1, 0, 0, 0);
+		} else {
+			pass.setIndexBuffer(call.part.index(), call.part.indexType());
+			pass.drawIndexed(call.part.indexCount(), 1, 0, 0, 0);
+		}
 	}
 
 	private static void meshRender(LevelRenderContext context, boolean blendPass) {
@@ -658,46 +742,52 @@ public final class WorldRenderer {
 		Matrix4f viewRotation = camera.viewRotationMatrix;
 		Matrix4f projection = camera.projectionMatrix;
 		Frustum frustum = camera.cullFrustum;
-		CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
 		GameRenderer gameRenderer = context.gameRenderer();
-		RenderTarget target = gameRenderer.mainRenderTarget();
-		GpuTextureView color = target.getColorTextureView();
-		GpuTextureView depth = target.getDepthTextureView();
 		GpuTextureView lightmap = gameRenderer.lightmap();
 
-		try (RenderPass pass = encoder.createRenderPass(() -> "mcgltf mesh", color, Optional.empty(), depth, OptionalDouble.empty())) {
-			MeshShaderRenderer.begin(lightmap);
-			for (SceneRegistry.Instance instance : instances) {
-				GpuModel model = instance.model();
-				if (!visible(frustum, model.aabb(), instance)) {
+		MeshShaderRenderer.begin(lightmap);
+		for (SceneRegistry.Instance instance : instances) {
+			GpuModel model = instance.model();
+			if (!visible(frustum, model.aabb(), instance)) {
+				continue;
+			}
+			float dx = (float)(instance.x() - cameraPos.x);
+			float dy = (float)(instance.y() - cameraPos.y);
+			float dz = (float)(instance.z() - cameraPos.z);
+			RenderClass rc = model.renderClass();
+			LodConfig lod = LodConfig.of(rc);
+			if (!lodWithin(dx, dy, dz, lod.renderDist())) {
+				continue;
+			}
+			if (blendPass && !lodWithin(dx, dy, dz, lod.transparencyDist())) {
+				continue;
+			}
+			boolean animate = rc.animated() && lodWithin(dx, dy, dz, lod.animationDist());
+			int light = light(level, instance);
+			SkeletonPose pose = animate ? instance.animator().evaluate() : instance.animator().restPose();
+			Matrix4f base = rotate(BASE.set(viewRotation)
+					.translate((float) (instance.x() - cameraPos.x), (float) (instance.y() - cameraPos.y), (float) (instance.z() - cameraPos.z)), instance)
+					.scale(instance.scale());
+			for (GpuModel.Part part : model.parts()) {
+				GpuModel.Material material = model.materials()[part.material()];
+				if ((material.alphaMode() == AlphaMode.BLEND) != blendPass) {
 					continue;
 				}
-				int light = light(level, instance);
-				SkeletonPose pose = instance.animator().evaluate();
-				Matrix4f base = rotate(BASE.set(viewRotation)
-						.translate((float) (instance.x() - cameraPos.x), (float) (instance.y() - cameraPos.y), (float) (instance.z() - cameraPos.z)), instance)
-						.scale(instance.scale());
-				for (GpuModel.Part part : model.parts()) {
-					GpuModel.Material material = model.materials()[part.material()];
-					if ((material.alphaMode() == AlphaMode.BLEND) != blendPass) {
-						continue;
-					}
-					Matrix4f modelView = part.skinVertex() != null ? base : MODEL_VIEW.set(base).mul(pose.global(part.node()));
-					projection.mul(modelView, MVP);
-					NORMAL_MATRIX.set(modelView);
-					Matrix4f[] joints = part.skinVertex() != null
-							? jointMatricesShared(pose, model.model().skins()[part.skin()].joints(), model.ibm()[part.skin()]) : null;
-					int morphCount = 0;
-					if (part.morphBuffer() != null) {
-						Arrays.fill(MORPH_IDX, 0);
-						Arrays.fill(MORPH_WT, 0.0f);
-						morphCount = selectMorphs(pose.weights(part.node()));
-					}
-					MeshShaderRenderer.draw(part, material, MVP, NORMAL_MATRIX, light, joints, morphCount, MORPH_IDX, MORPH_WT);
+				Matrix4f modelView = part.skinVertex() != null ? base : MODEL_VIEW.set(base).mul(pose.global(part.node()));
+				projection.mul(modelView, MVP);
+				NORMAL_MATRIX.set(modelView);
+				Matrix4f[] joints = part.skinVertex() != null
+						? jointMatricesShared(pose, model.model().skins()[part.skin()].joints(), model.ibm()[part.skin()]) : null;
+				int morphCount = 0;
+				if (part.morphBuffer() != null) {
+					Arrays.fill(MORPH_IDX, 0);
+					Arrays.fill(MORPH_WT, 0.0f);
+					morphCount = selectMorphs(pose.weights(part.node()));
 				}
+				MeshShaderRenderer.draw(part, material, MVP, NORMAL_MATRIX, light, joints, morphCount, MORPH_IDX, MORPH_WT);
 			}
-			MeshShaderRenderer.end();
 		}
+		MeshShaderRenderer.end();
 	}
 
 	private static GpuBufferSlice palette(CommandEncoder encoder, SkeletonPose pose, int[] joints, Matrix4f[] ibm, int alignment) {
@@ -780,6 +870,10 @@ public final class WorldRenderer {
 		return frustum.isVisible(new AABB(
 				instance.x() + aabb[0] * scale, instance.y() + aabb[1] * scale, instance.z() + aabb[2] * scale,
 				instance.x() + aabb[3] * scale, instance.y() + aabb[4] * scale, instance.z() + aabb[5] * scale));
+	}
+
+	private static boolean lodWithin(float dx, float dy, float dz, float maxDist) {
+		return dx * dx + dy * dy + dz * dz <= maxDist * maxDist;
 	}
 
 	private static int light(ClientLevel level, SceneRegistry.Instance instance) {

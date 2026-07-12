@@ -132,13 +132,13 @@ public final class ModelCommands {
 		FabricClientCommandSource source = context.getSource();
 		Path path = EditorConfig.directory().resolve(name);
 		if (!Files.isRegularFile(path)) {
-			source.sendError(Component.literal("模型不存在: " + name));
+			source.sendError(Component.translatable("mcgltf.command.missing_model", name));
 			return 0;
 		}
 		double x = source.getPlayer().getX();
 		double y = source.getPlayer().getY();
 		double z = source.getPlayer().getZ();
-		source.sendFeedback(Component.literal("加载中: " + name));
+		source.sendFeedback(Component.translatable("mcgltf.command.loading", name));
 		ModelLoader.loadAsync(path).whenComplete((result, error) ->
 				source.getClient().execute(() -> placeResult(source, result, error, name, x, y, z, scale, 0.0f, 0.0f, 0.0f)));
 		return 1;
@@ -147,11 +147,11 @@ public final class ModelCommands {
 	private static void placeResult(FabricClientCommandSource source, LoadResult result, Throwable error,
 			String name, double x, double y, double z, float scale, float rx, float ry, float rz) {
 		if (error != null) {
-			source.sendError(Component.literal("加载异常: " + error.getMessage()));
+			source.sendError(Component.translatable("mcgltf.command.load_exception", error.getMessage()));
 			return;
 		}
 		if (!(result instanceof LoadResult.Success ok)) {
-			source.sendError(Component.literal("✘ 加载失败"));
+			source.sendError(Component.translatable("mcgltf.command.load_fail"));
 			if (result instanceof LoadResult.Failure failed) {
 				reportIssues(source, failed.issues());
 			}
@@ -162,34 +162,34 @@ public final class ModelCommands {
 			SceneRegistry.Instance placed = new SceneRegistry.Instance(model, name, x, y, z, scale, new Animator(model.model()));
 			placed.rotation(rx, ry, rz);
 			SceneRegistry.add(placed);
-			source.sendFeedback(Component.literal("✔ 已放置 " + ok.model().name() + " · 序号 " + (SceneRegistry.count() - 1)));
+			source.sendFeedback(Component.translatable("mcgltf.command.placed", ok.model().name(), SceneRegistry.count() - 1));
 		} catch (RuntimeException e) {
-			source.sendError(Component.literal("GPU 上传失败: " + e.getMessage()));
+			source.sendError(Component.translatable("mcgltf.command.gpu_upload_fail", e.getMessage()));
 		}
 	}
 
 	private static int menu(CommandContext<FabricClientCommandSource> context) {
 		FabricClientCommandSource source = context.getSource();
-		source.sendFeedback(section("MCglTF 模型编辑器"));
+		source.sendFeedback(section(Component.translatable("mcgltf.command.editor_title")));
 		source.sendFeedback(Component.literal(" ")
-				.append(button("[模型列表]", ChatFormatting.GREEN, "/mcgltf list"))
-				.append(button(" [进入编辑]", ChatFormatting.AQUA, "/mcgltf edit"))
-				.append(button(" [标记准星]", ChatFormatting.YELLOW, "/mcgltf pick"))
-				.append(button(" [清空]", ChatFormatting.RED, "/mcgltf clear")));
+				.append(button(Component.translatable("mcgltf.command.model_list"), ChatFormatting.GREEN, "/mcgltf list"))
+				.append(button(Component.translatable("mcgltf.command.enter_edit"), ChatFormatting.AQUA, "/mcgltf edit"))
+				.append(button(Component.translatable("mcgltf.command.pick"), ChatFormatting.YELLOW, "/mcgltf pick"))
+				.append(button(Component.translatable("mcgltf.command.clear"), ChatFormatting.RED, "/mcgltf clear")));
 		source.sendFeedback(Component.literal(" ")
-				.append(openFileButton("[打开模型文件夹]", ChatFormatting.GOLD, EditorConfig.directory())));
-		source.sendFeedback(hint(" 加载: /mcgltf load <模型>   放置对象: /mcgltfobj block|item|entity <模型>"));
-		source.sendFeedback(hint(" 变换: 选中后 move/scale/rotate, 或 [编辑] 拖拽 gizmo (G/R/S 切模式)"));
-		source.sendFeedback(hint(" 动画: /mcgltf anim <片段> · speed · seek · loop · crossfade"));
-		source.sendFeedback(hint(" 场景: /mcgltf save <名> · open <名>"));
+				.append(openFileButton(Component.translatable("mcgltf.command.open_model_dir"), ChatFormatting.GOLD, EditorConfig.directory())));
+		source.sendFeedback(hint(Component.translatable("mcgltf.command.help_load")));
+		source.sendFeedback(hint(Component.translatable("mcgltf.command.help_transform")));
+		source.sendFeedback(hint(Component.translatable("mcgltf.command.help_anim")));
+		source.sendFeedback(hint(Component.translatable("mcgltf.command.help_scene")));
 		return 1;
 	}
 
 	private static int listPanel(CommandContext<FabricClientCommandSource> context) {
 		boolean shown = ListPanel.toggle();
-		context.getSource().sendFeedback(Component.literal(shown
-			? "模型面板已开启（打开聊天时显示在右下角）"
-			: "模型面板已关闭").withStyle(shown ? ChatFormatting.GREEN : ChatFormatting.GRAY));
+		context.getSource().sendFeedback((shown
+			? Component.translatable("mcgltf.command.panel_on")
+			: Component.translatable("mcgltf.command.panel_off")).withStyle(shown ? ChatFormatting.GREEN : ChatFormatting.GRAY));
 		return 1;
 	}
 
@@ -224,11 +224,11 @@ public final class ModelCommands {
 		int index = IntegerArgumentType.getInteger(context, "index");
 		FabricClientCommandSource source = context.getSource();
 		if (index < 0 || index >= SceneRegistry.count()) {
-			source.sendError(Component.literal("序号无效: " + index));
+			source.sendError(Component.translatable("mcgltf.command.invalid_index", index));
 			return 0;
 		}
 		source.getClient().execute(() -> SceneRegistry.remove(index));
-		source.sendFeedback(Component.literal("已删除 [" + index + "]").withStyle(ChatFormatting.RED));
+		source.sendFeedback(Component.translatable("mcgltf.command.deleted_item", index).withStyle(ChatFormatting.RED));
 		return 1;
 	}
 
@@ -236,93 +236,93 @@ public final class ModelCommands {
 		FabricClientCommandSource source = context.getSource();
 		SceneRegistry.Instance instance = SceneRegistry.selected();
 		if (instance == null) {
-			source.sendError(Component.literal("未选中模型, 用 /mcgltf select <序号>"));
+			source.sendError(Component.translatable("mcgltf.command.not_selected"));
 			return 0;
 		}
 		double x = source.getPlayer().getX();
 		double y = source.getPlayer().getY();
 		double z = source.getPlayer().getZ();
 		instance.position(x, y, z);
-		source.sendFeedback(Component.literal(String.format(Locale.ROOT, "移到脚下 → %.2f %.2f %.2f", x, y, z)).withStyle(ChatFormatting.GREEN));
+		source.sendFeedback(Component.translatable("mcgltf.command.moved_here", x, y, z).withStyle(ChatFormatting.GREEN));
 		return 1;
 	}
 
 	private static int toggleHud(CommandContext<FabricClientCommandSource> context) {
 		EditorConfig.hud = !EditorConfig.hud;
 		EditorConfig.save();
-		context.getSource().sendFeedback(Component.literal("状态 HUD " + (EditorConfig.hud ? "已开启" : "已关闭"))
+		context.getSource().sendFeedback(EditorConfig.hud ? Component.translatable("mcgltf.command.hud_on") : Component.translatable("mcgltf.command.hud_off")
 				.withStyle(EditorConfig.hud ? ChatFormatting.GREEN : ChatFormatting.GRAY));
 		return 1;
 	}
 
-	private static MutableComponent openFileButton(String label, ChatFormatting color, Path path) {
+	private static MutableComponent openFileButton(Component label, ChatFormatting color, Path path) {
 		Component hover = Component.literal(path.toString()).withStyle(ChatFormatting.GRAY);
-		return Component.literal(label).withStyle(style -> style.withColor(color)
+		return label.copy().withStyle(style -> style.withColor(color)
 				.withClickEvent(new ClickEvent.OpenFile(path))
 				.withHoverEvent(new HoverEvent.ShowText(hover)));
 	}
 
-	private static MutableComponent hint(String text) {
-		return Component.literal(text).withStyle(ChatFormatting.DARK_GRAY);
+	private static MutableComponent hint(Component text) {
+		return text.copy().withStyle(ChatFormatting.DARK_GRAY);
 	}
 
-	private static MutableComponent section(String title) {
+	private static MutableComponent section(Component title) {
 		return Component.literal("▸ ").withStyle(ChatFormatting.DARK_AQUA)
-				.append(Component.literal(title).withStyle(ChatFormatting.AQUA, ChatFormatting.BOLD));
+				.append(title.copy().withStyle(ChatFormatting.AQUA, ChatFormatting.BOLD));
 	}
 
 
-	private static MutableComponent button(String label, ChatFormatting color, String command) {
-		return Component.literal(label).withStyle(style -> style.withColor(color).withClickEvent(new ClickEvent.RunCommand(command)));
+	private static MutableComponent button(Component label, ChatFormatting color, String command) {
+		return label.copy().withStyle(style -> style.withColor(color).withClickEvent(new ClickEvent.RunCommand(command)));
 	}
 
 	private static int select(CommandContext<FabricClientCommandSource> context) {
 		int index = IntegerArgumentType.getInteger(context, "index");
 		if (!SceneRegistry.select(index)) {
-			context.getSource().sendError(Component.literal("序号无效: " + index));
+			context.getSource().sendError(Component.translatable("mcgltf.command.invalid_index", index));
 			return 0;
 		}
-		context.getSource().sendFeedback(Component.literal("已选中 [" + index + "] " + SceneRegistry.selected().source()));
+		context.getSource().sendFeedback(Component.translatable("mcgltf.command.selected_item", index, SceneRegistry.selected().source()));
 		return 1;
 	}
 
 	private static int move(CommandContext<FabricClientCommandSource> context) {
 		SceneRegistry.Instance instance = SceneRegistry.selected();
 		if (instance == null) {
-			context.getSource().sendError(Component.literal("未选中模型, 用 /mcgltf select <序号>"));
+			context.getSource().sendError(Component.translatable("mcgltf.command.not_selected"));
 			return 0;
 		}
 		double x = DoubleArgumentType.getDouble(context, "x");
 		double y = DoubleArgumentType.getDouble(context, "y");
 		double z = DoubleArgumentType.getDouble(context, "z");
 		instance.position(x, y, z);
-		context.getSource().sendFeedback(Component.literal(String.format(Locale.ROOT, "位置 → %.2f %.2f %.2f", x, y, z)));
+		context.getSource().sendFeedback(Component.translatable("mcgltf.command.moved_to", x, y, z));
 		return 1;
 	}
 
 	private static int scale(CommandContext<FabricClientCommandSource> context) {
 		SceneRegistry.Instance instance = SceneRegistry.selected();
 		if (instance == null) {
-			context.getSource().sendError(Component.literal("未选中模型, 用 /mcgltf select <序号>"));
+			context.getSource().sendError(Component.translatable("mcgltf.command.not_selected"));
 			return 0;
 		}
 		float value = FloatArgumentType.getFloat(context, "value");
 		instance.scale(value);
-		context.getSource().sendFeedback(Component.literal("缩放 → ×" + value));
+		context.getSource().sendFeedback(Component.translatable("mcgltf.command.scaled_to", value));
 		return 1;
 	}
 
 	private static int rotate(CommandContext<FabricClientCommandSource> context) {
 		SceneRegistry.Instance instance = SceneRegistry.selected();
 		if (instance == null) {
-			context.getSource().sendError(Component.literal("未选中模型, 用 /mcgltf select <序号>"));
+			context.getSource().sendError(Component.translatable("mcgltf.command.not_selected"));
 			return 0;
 		}
 		float x = FloatArgumentType.getFloat(context, "x");
 		float y = FloatArgumentType.getFloat(context, "y");
 		float z = FloatArgumentType.getFloat(context, "z");
 		instance.rotation(x, y, z);
-		context.getSource().sendFeedback(Component.literal(String.format(Locale.ROOT, "旋转 → %.1f° %.1f° %.1f°", x, y, z)));
+		context.getSource().sendFeedback(Component.translatable("mcgltf.command.rotated_to", x, y, z));
 		return 1;
 	}
 
@@ -348,10 +348,10 @@ public final class ModelCommands {
 			Path dir = EditorConfig.directory().resolve(SCENES_DIR);
 			Files.createDirectories(dir);
 			Files.writeString(dir.resolve(name + ".json"), json.toString());
-			source.sendFeedback(Component.literal("✔ 场景已保存: " + name + " (" + instances.size() + " 个模型)"));
+			source.sendFeedback(Component.translatable("mcgltf.command.scene_saved", name, instances.size()));
 			return 1;
 		} catch (IOException e) {
-			source.sendError(Component.literal("保存失败: " + e.getMessage()));
+			source.sendError(Component.translatable("mcgltf.command.save_fail", e.getMessage()));
 			return 0;
 		}
 	}
@@ -361,18 +361,18 @@ public final class ModelCommands {
 		FabricClientCommandSource source = context.getSource();
 		Path file = EditorConfig.directory().resolve(SCENES_DIR).resolve(name + ".json");
 		if (!Files.isRegularFile(file)) {
-			source.sendError(Component.literal("场景不存在: " + name));
+			source.sendError(Component.translatable("mcgltf.command.scene_not_found", name));
 			return 0;
 		}
 		Any root;
 		try {
 			root = JsonIterator.deserialize(Files.readAllBytes(file));
 		} catch (IOException | RuntimeException e) {
-			source.sendError(Component.literal("读取失败: " + e.getMessage()));
+			source.sendError(Component.translatable("mcgltf.command.read_fail", e.getMessage()));
 			return 0;
 		}
 		if (root == null || root.valueType() != ValueType.ARRAY) {
-			source.sendError(Component.literal("场景格式无效"));
+			source.sendError(Component.translatable("mcgltf.command.invalid_scene"));
 			return 0;
 		}
 		SceneRegistry.clear();
@@ -394,33 +394,32 @@ public final class ModelCommands {
 			ModelLoader.loadAsync(path).whenComplete((result, error) ->
 					source.getClient().execute(() -> placeResult(source, result, error, modelName, x, y, z, scale, rx, ry, rz)));
 		}
-		source.sendFeedback(Component.literal("加载场景 " + name + " · " + loaded + " 个模型"));
+		source.sendFeedback(Component.translatable("mcgltf.command.scene_loaded", name, loaded));
 		return 1;
 	}
 
 	private static int clear(CommandContext<FabricClientCommandSource> context) {
 		context.getSource().getClient().execute(SceneRegistry::clear);
-		context.getSource().sendFeedback(Component.literal("已清除全部实例"));
+		context.getSource().sendFeedback(Component.translatable("mcgltf.command.cleared"));
 		return 1;
 	}
 
 	private static int edit(CommandContext<FabricClientCommandSource> context) {
 		FabricClientCommandSource source = context.getSource();
 		if (SceneRegistry.selected() == null) {
-			source.sendError(Component.literal("未选中模型, 用 /mcgltf select <序号>"));
+			source.sendError(Component.translatable("mcgltf.command.not_selected"));
 			return 0;
 		}
 		GizmoRenderer.show(GizmoRenderer.mode());
 		source.getClient().execute(() -> source.getClient().gui.setScreen(new GizmoScreen()));
-		source.sendFeedback(Component.literal("进入 gizmo 编辑 · 鼠标拖拽轴变换; G/R/S 切换 移动/旋转/缩放; Esc 退出"));
+		source.sendFeedback(Component.translatable("mcgltf.command.gizmo_enter"));
 		return 1;
 	}
 
 	private static int resetModelDir(CommandContext<FabricClientCommandSource> context) {
 		EditorConfig.modelDirectory = "";
 		EditorConfig.save();
-		context.getSource().sendFeedback(Component.literal("模型目录 → 默认 config/mcgltf/model ("
-				+ EditorConfig.listModels().size() + " 个模型)"));
+		context.getSource().sendFeedback(Component.translatable("mcgltf.command.model_dir_default", EditorConfig.listModels().size()));
 		return 1;
 	}
 
@@ -429,8 +428,7 @@ public final class ModelCommands {
 		EditorConfig.modelDirectory = path;
 		EditorConfig.save();
 		List<String> files = EditorConfig.listModels();
-		context.getSource().sendFeedback(Component.literal("模型目录 → "
-				+ (path.isEmpty() ? "默认 config/mcgltf" : path) + " (" + files.size() + " 个模型)"));
+		context.getSource().sendFeedback(Component.translatable("mcgltf.command.model_dir", path.isEmpty() ? "config/mcgltf" : path, files.size()));
 		return 1;
 	}
 
@@ -440,42 +438,42 @@ public final class ModelCommands {
 		HitResult hit = client.hitResult;
 		if (hit instanceof EntityHitResult entityHit && entityHit.getEntity() instanceof ModelEntity model) {
 			SceneRegistry.selectManaged(model.getId());
-			source.sendFeedback(Component.literal("✔ 已标记模型生物 #" + model.getId()));
+			source.sendFeedback(Component.translatable("mcgltf.command.picked_entity", model.getId()));
 			return 1;
 		}
 		if (hit instanceof BlockHitResult blockHit && client.level != null
 				&& client.level.getBlockState(blockHit.getBlockPos()).getBlock() == ModelObjects.MODEL_BLOCK) {
 			SceneRegistry.selectManaged(blockHit.getBlockPos().immutable());
-			source.sendFeedback(Component.literal("✔ 已标记模型方块 @ " + blockHit.getBlockPos().toShortString()));
+			source.sendFeedback(Component.translatable("mcgltf.command.picked_block", blockHit.getBlockPos().toShortString()));
 			return 1;
 		}
 		SceneRegistry.selectManaged(null);
-		source.sendFeedback(Component.literal("已清除标记（准星需对准模型方块/生物）"));
+		source.sendFeedback(Component.translatable("mcgltf.command.clear_pick"));
 		return 1;
 	}
 
 	private static int gizmo(CommandContext<FabricClientCommandSource> context, GizmoRenderer.Mode mode) {
 		FabricClientCommandSource source = context.getSource();
 		if (SceneRegistry.selected() == null) {
-			source.sendError(Component.literal("未选中模型, 用 /mcgltf select <序号>"));
+			source.sendError(Component.translatable("mcgltf.command.not_selected"));
 			return 0;
 		}
 		GizmoRenderer.show(mode);
-		source.sendFeedback(Component.literal(gizmoName(mode) + " gizmo 已显示"));
+		source.sendFeedback(Component.translatable("mcgltf.command.gizmo_shown", gizmoName(mode)));
 		return 1;
 	}
 
 	private static int gizmoOff(CommandContext<FabricClientCommandSource> context) {
 		GizmoRenderer.hide();
-		context.getSource().sendFeedback(Component.literal("gizmo 已隐藏"));
+		context.getSource().sendFeedback(Component.translatable("mcgltf.command.gizmo_hidden"));
 		return 1;
 	}
 
 	private static String gizmoName(GizmoRenderer.Mode mode) {
 		return switch (mode) {
-			case MOVE -> "移动";
-			case ROTATE -> "旋转";
-			case SCALE -> "缩放";
+			case MOVE -> Component.translatable("mcgltf.hud.move").getString();
+			case ROTATE -> Component.translatable("mcgltf.hud.rotate").getString();
+			case SCALE -> Component.translatable("mcgltf.hud.scale").getString();
 		};
 	}
 
@@ -490,10 +488,10 @@ public final class ModelCommands {
 			}
 		}
 		if (applied == 0) {
-			source.sendError(Component.literal("未找到动画: " + clip));
+			source.sendError(Component.translatable("mcgltf.command.anim_not_found", clip));
 			return 0;
 		}
-		source.sendFeedback(Component.literal("▶ 动画 '" + clip + "' 应用于 " + applied + " 个实例"));
+		source.sendFeedback(Component.translatable("mcgltf.command.anim_play", clip, applied));
 		return 1;
 	}
 
@@ -509,30 +507,30 @@ public final class ModelCommands {
 			}
 		}
 		if (applied == 0) {
-			source.sendError(Component.literal("未找到动画: " + clip));
+			source.sendError(Component.translatable("mcgltf.command.anim_not_found", clip));
 			return 0;
 		}
-		source.sendFeedback(Component.literal("⇄ 交叉淡入 '" + clip + "' " + seconds + "s · " + applied + " 个实例"));
+		source.sendFeedback(Component.translatable("mcgltf.command.anim_crossfade", clip, seconds, applied));
 		return 1;
 	}
 
 	private static int speed(CommandContext<FabricClientCommandSource> context) {
 		float value = FloatArgumentType.getFloat(context, "value");
 		forEachAnimator(animator -> animator.setSpeed(value));
-		context.getSource().sendFeedback(Component.literal("速度 x" + value));
+		context.getSource().sendFeedback(Component.translatable("mcgltf.command.anim_speed", value));
 		return 1;
 	}
 
 	private static int seek(CommandContext<FabricClientCommandSource> context) {
 		float value = FloatArgumentType.getFloat(context, "value");
 		forEachAnimator(animator -> animator.seek(value));
-		context.getSource().sendFeedback(Component.literal("seek " + value + "s"));
+		context.getSource().sendFeedback(Component.translatable("mcgltf.command.anim_seek", value));
 		return 1;
 	}
 
 	private static int playing(CommandContext<FabricClientCommandSource> context, boolean value) {
 		forEachAnimator(animator -> animator.setPlaying(value));
-		context.getSource().sendFeedback(Component.literal(value ? "▶ 继续" : "⏸ 暂停"));
+		context.getSource().sendFeedback(value ? Component.translatable("mcgltf.command.anim_resume") : Component.translatable("mcgltf.command.anim_pause"));
 		return 1;
 	}
 
@@ -543,7 +541,7 @@ public final class ModelCommands {
 			default -> Animator.Loop.LOOP;
 		};
 		forEachAnimator(animator -> animator.setLoop(mode));
-		context.getSource().sendFeedback(Component.literal("循环模式 " + mode));
+		context.getSource().sendFeedback(Component.translatable("mcgltf.command.anim_loop", mode));
 		return 1;
 	}
 
@@ -554,7 +552,7 @@ public final class ModelCommands {
 	}
 
 	private static Message tooltip(Path path, String name) {
-		String type = name.toLowerCase(Locale.ROOT).endsWith(".glb") ? "GLB 二进制" : "glTF";
+		String type = name.toLowerCase(Locale.ROOT).endsWith(".glb") ? Component.translatable("mcgltf.command.glb_binary").getString() : "glTF";
 		try {
 			return new LiteralMessage(type + " · " + formatSize(Files.size(path)));
 		} catch (IOException e) {
@@ -602,7 +600,7 @@ public final class ModelCommands {
 		int shown = 0;
 		for (ValidationIssue issue : issues) {
 			if (shown++ >= MAX_REPORTED_ISSUES) {
-				source.sendFeedback(Component.literal("… 其余 " + (issues.size() - MAX_REPORTED_ISSUES) + " 条省略"));
+				source.sendFeedback(Component.translatable("mcgltf.command.issues_omitted", issues.size() - MAX_REPORTED_ISSUES));
 				return;
 			}
 			String prefix = issue.severity() == ValidationIssue.Severity.ERROR ? "✘ " : "⚠ ";

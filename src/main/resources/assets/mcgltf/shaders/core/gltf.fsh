@@ -26,7 +26,11 @@ out vec4 fragColor;
 #endif
 
 void main() {
+#ifdef LOD_SIMPLE
+    vec4 color = BaseColorFactor * vertexColor;
+#else
     vec4 color = texture(Sampler0, texCoord0) * BaseColorFactor * vertexColor;
+#endif
 #ifdef ALPHA_MASK
     if (color.a < AlphaCutoff) {
         discard;

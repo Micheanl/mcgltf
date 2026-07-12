@@ -19,11 +19,11 @@ public final class ShaderProgram implements AutoCloseable {
 	public static String read(String path) {
 		try (InputStream in = ShaderProgram.class.getResourceAsStream(path)) {
 			if (in == null) {
-				throw new IOException("缺少 " + path);
+				throw new IOException("missing " + path);
 			}
 			return new String(in.readAllBytes(), StandardCharsets.UTF_8);
 		} catch (IOException e) {
-			throw new IllegalStateException("读取着色器失败: " + path, e);
+			throw new IllegalStateException("shader read failed: " + path, e);
 		}
 	}
 
@@ -43,7 +43,7 @@ public final class ShaderProgram implements AutoCloseable {
 		if (GL20C.glGetProgrami(program, GL20C.GL_LINK_STATUS) == 0) {
 			String log = GL20C.glGetProgramInfoLog(program);
 			GL20C.glDeleteProgram(program);
-			throw new IllegalStateException("链接失败: " + log);
+			throw new IllegalStateException("link failed: " + log);
 		}
 		return new ShaderProgram(program);
 	}
@@ -55,7 +55,7 @@ public final class ShaderProgram implements AutoCloseable {
 		if (GL20C.glGetShaderi(shader, GL20C.GL_COMPILE_STATUS) == 0) {
 			String log = GL20C.glGetShaderInfoLog(shader);
 			GL20C.glDeleteShader(shader);
-			throw new IllegalStateException("编译失败: " + log);
+			throw new IllegalStateException("compilation failed: " + log);
 		}
 		return shader;
 	}

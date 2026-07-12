@@ -60,13 +60,13 @@ public final class HudStatus implements HudElement {
 	}
 
 	private static Component gizmoLine() {
-		String name = switch (GizmoRenderer.mode()) {
-			case MOVE -> "移动";
-			case ROTATE -> "旋转";
-			case SCALE -> "缩放";
+		String key = switch (GizmoRenderer.mode()) {
+			case MOVE -> "mcgltf.hud.move";
+			case ROTATE -> "mcgltf.hud.rotate";
+			case SCALE -> "mcgltf.hud.scale";
 		};
 		return Component.literal("gizmo ").withStyle(ChatFormatting.GRAY)
-				.append(Component.literal(name).withStyle(ChatFormatting.LIGHT_PURPLE))
-				.append(Component.literal("  拖拽轴 · G/R/S 切换").withStyle(ChatFormatting.DARK_GRAY));
+				.append(Component.translatable(key).withStyle(ChatFormatting.LIGHT_PURPLE))
+				.append(Component.literal("  ").append(Component.translatable("mcgltf.hud.drag_help")).withStyle(ChatFormatting.DARK_GRAY));
 	}
 }

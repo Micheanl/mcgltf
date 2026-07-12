@@ -23,6 +23,20 @@ public final class EditorConfig {
 	public static boolean hud = true;
 	public static String modelDirectory = "";
 
+	public static float lodTerrainRenderDist = 512.0f;
+	public static float lodTerrainTransparencyDist = 512.0f;
+	public static float lodStaticRenderDist = 128.0f;
+	public static float lodStaticTransparencyDist = 128.0f;
+	public static float lodSkinnedRenderDist = 128.0f;
+	public static float lodSkinnedAnimationDist = 48.0f;
+	public static float lodSkinnedTransparencyDist = 32.0f;
+	public static float lodMorphedRenderDist = 128.0f;
+	public static float lodMorphedAnimationDist = 48.0f;
+	public static float lodMorphedTransparencyDist = 32.0f;
+	public static float lodSkinnedMorphedRenderDist = 128.0f;
+	public static float lodSkinnedMorphedAnimationDist = 48.0f;
+	public static float lodSkinnedMorphedTransparencyDist = 32.0f;
+
 	private static final Path DIR = FabricLoader.getInstance().getConfigDir().resolve(MCglTF.MOD_ID);
 	private static final Path FILE = DIR.resolve("config.json");
 	private static final Path MODEL_DIR = DIR.resolve("model");
@@ -79,6 +93,19 @@ public final class EditorConfig {
 					itemRender = bool(root, "itemRender", itemRender);
 					hud = bool(root, "hud", hud);
 					modelDirectory = string(root, "modelDirectory", modelDirectory);
+						lodTerrainRenderDist = flt(root, "lodTerrainRenderDist", lodTerrainRenderDist);
+						lodTerrainTransparencyDist = flt(root, "lodTerrainTransparencyDist", lodTerrainTransparencyDist);
+						lodStaticRenderDist = flt(root, "lodStaticRenderDist", lodStaticRenderDist);
+						lodStaticTransparencyDist = flt(root, "lodStaticTransparencyDist", lodStaticTransparencyDist);
+						lodSkinnedRenderDist = flt(root, "lodSkinnedRenderDist", lodSkinnedRenderDist);
+						lodSkinnedAnimationDist = flt(root, "lodSkinnedAnimationDist", lodSkinnedAnimationDist);
+						lodSkinnedTransparencyDist = flt(root, "lodSkinnedTransparencyDist", lodSkinnedTransparencyDist);
+						lodMorphedRenderDist = flt(root, "lodMorphedRenderDist", lodMorphedRenderDist);
+						lodMorphedAnimationDist = flt(root, "lodMorphedAnimationDist", lodMorphedAnimationDist);
+						lodMorphedTransparencyDist = flt(root, "lodMorphedTransparencyDist", lodMorphedTransparencyDist);
+						lodSkinnedMorphedRenderDist = flt(root, "lodSkinnedMorphedRenderDist", lodSkinnedMorphedRenderDist);
+						lodSkinnedMorphedAnimationDist = flt(root, "lodSkinnedMorphedAnimationDist", lodSkinnedMorphedAnimationDist);
+						lodSkinnedMorphedTransparencyDist = flt(root, "lodSkinnedMorphedTransparencyDist", lodSkinnedMorphedTransparencyDist);
 					return;
 				}
 			} catch (Exception ignored) {
@@ -111,6 +138,11 @@ public final class EditorConfig {
 		return value.valueType() == ValueType.STRING ? value.toString() : fallback;
 	}
 
+	private static float flt(Any root, String key, float fallback) {
+		Any value = root.get(key);
+		return value.valueType() == ValueType.NUMBER ? value.toFloat() : fallback;
+	}
+
 	private static String toJson() {
 		return "{\n"
 				+ "\t\"meshShader\": " + meshShader + ",\n"
@@ -118,7 +150,20 @@ public final class EditorConfig {
 				+ "\t\"thumbnails\": " + thumbnails + ",\n"
 				+ "\t\"itemRender\": " + itemRender + ",\n"
 				+ "\t\"hud\": " + hud + ",\n"
-				+ "\t\"modelDirectory\": \"" + modelDirectory.replace("\\", "\\\\").replace("\"", "\\\"") + "\"\n"
+				+ "\t\"modelDirectory\": \"" + modelDirectory.replace("\\", "\\\\").replace("\"", "\\\"") + "\",\n"
+				+ "\t\"lodTerrainRenderDist\": " + lodTerrainRenderDist + ",\n"
+				+ "\t\"lodTerrainTransparencyDist\": " + lodTerrainTransparencyDist + ",\n"
+				+ "\t\"lodStaticRenderDist\": " + lodStaticRenderDist + ",\n"
+				+ "\t\"lodStaticTransparencyDist\": " + lodStaticTransparencyDist + ",\n"
+				+ "\t\"lodSkinnedRenderDist\": " + lodSkinnedRenderDist + ",\n"
+				+ "\t\"lodSkinnedAnimationDist\": " + lodSkinnedAnimationDist + ",\n"
+				+ "\t\"lodSkinnedTransparencyDist\": " + lodSkinnedTransparencyDist + ",\n"
+				+ "\t\"lodMorphedRenderDist\": " + lodMorphedRenderDist + ",\n"
+				+ "\t\"lodMorphedAnimationDist\": " + lodMorphedAnimationDist + ",\n"
+				+ "\t\"lodMorphedTransparencyDist\": " + lodMorphedTransparencyDist + ",\n"
+				+ "\t\"lodSkinnedMorphedRenderDist\": " + lodSkinnedMorphedRenderDist + ",\n"
+				+ "\t\"lodSkinnedMorphedAnimationDist\": " + lodSkinnedMorphedAnimationDist + ",\n"
+				+ "\t\"lodSkinnedMorphedTransparencyDist\": " + lodSkinnedMorphedTransparencyDist + "\n"
 				+ "}\n";
 	}
 }

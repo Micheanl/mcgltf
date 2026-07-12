@@ -14,9 +14,8 @@ public final class ThumbnailOverlay {
 	private static final int LINE_HEIGHT = 12;
 	private static final int SIZE = 96;
 	private static final int GAP = 4;
-	private static final int PADDING = 3;
 	private static final int SPIN_PERIOD_MS = 8000;
-	private static final Identifier FRAME = Identifier.withDefaultNamespace("widget/text_field");
+	private static final Identifier FRAME = Identifier.withDefaultNamespace("gamemode_switcher/selection");
 
 	private ThumbnailOverlay() {
 	}
@@ -45,8 +44,8 @@ public final class ThumbnailOverlay {
 		int x0 = rectX;
 		int y1 = rectY - GAP;
 		int y0 = y1 - SIZE;
-		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, FRAME,
-				x0 - PADDING, y0 - PADDING, SIZE + PADDING * 2, SIZE + PADDING * 2);
+		graphics.fill(x0, y0, x0 + SIZE, y0 + SIZE, 0xFF000000);
+		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, FRAME, x0, y0, SIZE, SIZE);
 		float angle = (System.currentTimeMillis() % SPIN_PERIOD_MS) / (float) SPIN_PERIOD_MS * 360.0f;
 		graphics.guiRenderState.addPicturesInPictureState(
 				new ThumbnailRenderState(text, angle, x0, y0, x0 + SIZE, y1, SIZE * 0.9f, null));
